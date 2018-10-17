@@ -91,15 +91,92 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+		  double delta = j[1]["steering_angle"];
+          double a = j[1]["throttle"];
+		  
+		  // Rotate and shift such that new reference system is centered on the origin @ 0 degrees
+			for (size_t i = 0; i < ptsx.size(); ++i) {
 
+				double shift_x = ptsx[i] - px;
+				double shift_y = ptsy[i] - py;
+
+				ptsx[i] = shift_x * cos(-psi) - shift_y * sin(-psi);
+				ptsy[i] = shift_x * sin(-psi) + shift_y * cos(-psi);
+			}
+			
+			// Convert to Eigen::VectorXd
+			double *ptrx = &ptsx[0];
+			Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
+
+			double *ptry = &ptsy[0];
+			Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
+
+			// Fit coefficients of third order polynomial
+			auto coeffs = polyfit(ptsx_transform, ptsy_transform, 3);
+
+			double cte = polyeval(coeffs, 0);
+			
+			// before reference system change: double epsi = psi - atan(coeffs[1] + 2*px*coeffs[2] + 3*coeffs[3] * pow(px,2));
+			//double epsi = psi - atan(coeffs[1] + 2*px*coeffs[2] + 3*coeffs[3] * pow(px,2));
+			double epsi = -atan(coeffs[1]);
+
+			// Latency for predicting time at actuation
+			const double dt = 0.1;
+
+			const double Lf = 2.67;
+
+			// Predict future state (take latency into account)
+			// x, y and psi are all zero in the new reference system
+			double pred_px        = 0.0 + v * dt;               // psi is zero, cos(0) = 1, can leave out
+			const double pred_py  = 0.0;                        // sin(0) = 0, y stays as 0 (y + v * 0 * dt)
+			double pred_psi       = 0.0 + v * -delta / Lf * dt;
+			double pred_v         = v + a * dt;
+			double pred_cte       = cte + v * sin(epsi) * dt;
+			double pred_epsi      = epsi + v * -delta / Lf * dt;
+
+			// Feed in the predicted state values
+			Eigen::VectorXd state(6);
+			state << pred_px, pred_py, pred_psi, pred_v, pred_cte, pred_epsi;
+
+			auto vars = mpc.Solve(state, coeffs);
+			
+			
+			// Display the waypoints / reference line
+			vector<double> next_x_vals;
+			vector<double> next_y_vals;
+
+			double poly_inc = 2.5; // step on x
+			int num_points = 25;    // how many point "in the future" to be plotted
+			for (int i = 1; i < num_points; ++i) {
+				double future_x = poly_inc * i;
+				double future_y = polyeval(coeffs, future_x);
+				next_x_vals.push_back(future_x);
+				next_y_vals.push_back(future_y);
+			}
+
+			// Normalize steering angle range [-deg2rad(25), deg2rad(25] -> [-1, 1].
+
+			const double angle_norm_factor = deg2rad(25) * Lf;
+			double steer_value = vars[0] / angle_norm_factor;
+			double throttle_value = vars[1];
+
+			//Display the MPC predicted trajectory
+			vector<double> mpc_x_vals;
+			vector<double> mpc_y_vals;
+
+			for (size_t i = 2; i < vars.size(); ++i) {
+				if (i % 2 == 0) mpc_x_vals.push_back(vars[i]);
+				else            mpc_y_vals.push_back(vars[i]);
+			}
+					
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          //double steer_value;
+          //double throttle_value;
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -107,19 +184,12 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
-          //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
