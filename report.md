@@ -12,7 +12,7 @@ The goal of this project is to navigate the track (provided through Udacity Simu
 [//]: # (Image References)
 
 [image1]: kinematic_equations.png "Equations"
-[video1]: ./Videos/12.gif "Proportional"
+[video1]: ./Videos/12sec.gif "Proportional"
 
 ---
 ## MPC Controller
