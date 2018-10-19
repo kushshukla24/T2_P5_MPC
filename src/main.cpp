@@ -116,8 +116,6 @@ int main() {
 
 			double cte = polyeval(coeffs, 0);
 			
-			// before reference system change: double epsi = psi - atan(coeffs[1] + 2*px*coeffs[2] + 3*coeffs[3] * pow(px,2));
-			//double epsi = psi - atan(coeffs[1] + 2*px*coeffs[2] + 3*coeffs[3] * pow(px,2));
 			double epsi = -atan(coeffs[1]);
 
 			// Latency for predicting time at actuation
@@ -126,7 +124,6 @@ int main() {
 			const double Lf = 2.67;
 
 			// Predict future state (take latency into account)
-			// x, y and psi are all zero in the new reference system
 			double pred_px        = 0.0 + v * dt;               // psi is zero, cos(0) = 1, can leave out
 			const double pred_py  = 0.0;                        // sin(0) = 0, y stays as 0 (y + v * 0 * dt)
 			double pred_psi       = 0.0 + v * -delta / Lf * dt;
@@ -145,7 +142,7 @@ int main() {
 			vector<double> next_x_vals;
 			vector<double> next_y_vals;
 
-			double poly_inc = 2.5; // step on x
+			double poly_inc = 2.5;  // step on x
 			int num_points = 25;    // how many point "in the future" to be plotted
 			for (int i = 1; i < num_points; ++i) {
 				double future_x = poly_inc * i;
@@ -154,8 +151,7 @@ int main() {
 				next_y_vals.push_back(future_y);
 			}
 
-			// Normalize steering angle range [-deg2rad(25), deg2rad(25] -> [-1, 1].
-
+			// Normalized steering angle range [-deg2rad(25), deg2rad(25] -> [-1, 1].
 			const double angle_norm_factor = deg2rad(25) * Lf;
 			double steer_value = vars[0] / angle_norm_factor;
 			double throttle_value = vars[1];
